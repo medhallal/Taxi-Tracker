@@ -1,0 +1,1124 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Taxi Financial Tracker</title>
+
+  <!-- Tailwind CSS via CDN (Play CDN – no build step required) -->
+  <script src="https://cdn.tailwindcss.com"></script>
+
+  <!-- Vue.js 3 via CDN -->
+  <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+
+  <style>
+    [v-cloak] { display: none; }
+    .fade-enter-active, .fade-leave-active { transition: opacity .2s; }
+    .fade-enter-from, .fade-leave-to { opacity: 0; }
+  </style>
+</head>
+<body class="bg-gray-100 min-h-screen font-sans antialiased" v-cloak>
+
+<div id="app">
+
+  <!-- ═══════════════════════════════════════════════════════════
+       LOGIN SCREEN
+  ══════════════════════════════════════════════════════════════ -->
+  <div v-if="!currentUser" class="min-h-screen flex items-center justify-center p-4">
+    <div class="bg-white rounded-2xl shadow-xl w-full max-w-sm p-8">
+
+      <div class="text-center mb-8">
+        <div class="text-5xl mb-3">🚖</div>
+        <h1 class="text-2xl font-bold text-gray-800">Taxi Financial Tracker</h1>
+        <p class="text-gray-500 text-sm mt-1">Sign in to your account</p>
+      </div>
+
+      <form @submit.prevent="login" class="space-y-4">
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">Username</label>
+          <input
+            v-model="loginForm.username"
+            type="text"
+            required
+            autocomplete="username"
+            class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            placeholder="admin"
+          />
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">Password</label>
+          <input
+            v-model="loginForm.password"
+            type="password"
+            required
+            autocomplete="current-password"
+            class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            placeholder="••••••••"
+          />
+        </div>
+
+        <div v-if="loginError" class="bg-red-50 border border-red-200 text-red-700 text-sm rounded-lg px-3 py-2">
+          {{ loginError }}
+        </div>
+
+        <button
+          type="submit"
+          :disabled="loginLoading"
+          class="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white font-semibold py-2 rounded-lg transition-colors text-sm"
+        >
+          <span v-if="loginLoading">Signing in…</span>
+          <span v-else>Sign in</span>
+        </button>
+      </form>
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════════════════════════════════
+       MAIN APPLICATION
+  ══════════════════════════════════════════════════════════════ -->
+  <div v-else>
+
+    <!-- ── Top Navigation Bar ──────────────────────────────── -->
+    <nav class="bg-white shadow-sm sticky top-0 z-30">
+      <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div class="flex items-center justify-between h-14">
+
+          <!-- Logo -->
+          <div class="flex items-center gap-2">
+            <span class="text-2xl">🚖</span>
+            <span class="font-bold text-gray-800 hidden sm:block">Taxi Tracker</span>
+          </div>
+
+          <!-- Nav Links (desktop) -->
+          <div class="hidden md:flex items-center gap-1">
+            <button
+              v-for="tab in visibleTabs"
+              :key="tab.id"
+              @click="switchView(tab.id)"
+              :class="['px-3 py-1.5 rounded-lg text-sm font-medium transition-colors',
+                        currentView === tab.id
+                          ? 'bg-blue-100 text-blue-700'
+                          : 'text-gray-600 hover:bg-gray-100']"
+            >
+              <span class="mr-1">{{ tab.icon }}</span>{{ tab.label }}
+            </button>
+          </div>
+
+          <!-- User / Logout -->
+          <div class="flex items-center gap-3">
+            <div class="text-right hidden sm:block">
+              <p class="text-sm font-semibold text-gray-800">{{ currentUser.full_name || currentUser.username }}</p>
+              <p class="text-xs text-gray-500 capitalize">{{ currentUser.role }}</p>
+            </div>
+            <button
+              @click="logout"
+              class="bg-gray-100 hover:bg-gray-200 text-gray-700 text-sm font-medium px-3 py-1.5 rounded-lg transition-colors"
+            >
+              Logout
+            </button>
+          </div>
+        </div>
+
+        <!-- Nav Links (mobile) -->
+        <div class="md:hidden flex items-center gap-1 pb-2 overflow-x-auto">
+          <button
+            v-for="tab in visibleTabs"
+            :key="tab.id"
+            @click="switchView(tab.id)"
+            :class="['whitespace-nowrap px-3 py-1 rounded-lg text-xs font-medium transition-colors flex-shrink-0',
+                      currentView === tab.id
+                        ? 'bg-blue-100 text-blue-700'
+                        : 'text-gray-600 hover:bg-gray-100']"
+          >
+            {{ tab.icon }} {{ tab.label }}
+          </button>
+        </div>
+      </div>
+    </nav>
+
+    <!-- ── Main Content ────────────────────────────────────── -->
+    <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+
+      <!-- Global error banner -->
+      <div v-if="globalError" class="mb-4 bg-red-50 border border-red-200 text-red-700 text-sm rounded-lg px-4 py-3 flex items-center justify-between">
+        <span>{{ globalError }}</span>
+        <button @click="globalError=''" class="text-red-500 hover:text-red-700 ml-4 font-bold">✕</button>
+      </div>
+
+      <!-- ── Dashboard ──────────────────────────────────────── -->
+      <div v-if="currentView === 'dashboard'">
+        <h2 class="text-xl font-bold text-gray-800 mb-6">Dashboard</h2>
+
+        <!-- KPI Cards -->
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+          <div class="bg-white rounded-xl shadow-sm p-5 border-l-4 border-blue-500">
+            <p class="text-sm text-gray-500 font-medium">Total Incomes</p>
+            <p class="text-2xl font-bold text-gray-800 mt-1">{{ formatMoney(dashboard.income_total) }}</p>
+          </div>
+          <div class="bg-white rounded-xl shadow-sm p-5 border-l-4 border-red-400">
+            <p class="text-sm text-gray-500 font-medium">Total Outcomes</p>
+            <p class="text-2xl font-bold text-gray-800 mt-1">{{ formatMoney(dashboard.outcome_total) }}</p>
+          </div>
+          <div class="bg-white rounded-xl shadow-sm p-5 border-l-4 border-orange-400">
+            <p class="text-sm text-gray-500 font-medium">Partner Transfers</p>
+            <p class="text-2xl font-bold text-gray-800 mt-1">{{ formatMoney(dashboard.transfer_total) }}</p>
+          </div>
+          <div :class="['bg-white rounded-xl shadow-sm p-5 border-l-4', dashboard.caisse >= 0 ? 'border-green-500' : 'border-red-500']">
+            <p class="text-sm text-gray-500 font-medium">Caisse Balance</p>
+            <p :class="['text-2xl font-bold mt-1', dashboard.caisse >= 0 ? 'text-green-600' : 'text-red-600']">
+              {{ formatMoney(dashboard.caisse) }}
+            </p>
+          </div>
+        </div>
+
+        <!-- Formula note -->
+        <p class="text-xs text-gray-400 mb-6">
+          Caisse = Incomes − Outcomes − Partner Transfers
+        </p>
+
+        <!-- Recent Activity -->
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <!-- Recent Incomes -->
+          <div class="bg-white rounded-xl shadow-sm p-5">
+            <h3 class="font-semibold text-gray-700 mb-3">Recent Incomes</h3>
+            <div v-if="dashboard.recent_incomes && dashboard.recent_incomes.length" class="space-y-2">
+              <div v-for="r in dashboard.recent_incomes" :key="r.id" class="flex justify-between text-sm">
+                <span class="text-gray-600">{{ r.date }}<span v-if="r.description" class="text-gray-400"> – {{ r.description }}</span></span>
+                <span class="font-semibold text-green-600">+{{ formatMoney(r.amount) }}</span>
+              </div>
+            </div>
+            <p v-else class="text-sm text-gray-400">No incomes yet.</p>
+          </div>
+
+          <!-- Recent Outcomes -->
+          <div class="bg-white rounded-xl shadow-sm p-5">
+            <h3 class="font-semibold text-gray-700 mb-3">Recent Outcomes</h3>
+            <div v-if="dashboard.recent_outcomes && dashboard.recent_outcomes.length" class="space-y-2">
+              <div v-for="r in dashboard.recent_outcomes" :key="r.id" class="flex justify-between text-sm">
+                <span class="text-gray-600">{{ r.date }} – {{ r.description }}</span>
+                <span class="font-semibold text-red-500">-{{ formatMoney(r.amount) }}</span>
+              </div>
+            </div>
+            <p v-else class="text-sm text-gray-400">No outcomes yet.</p>
+          </div>
+
+          <!-- Recent Transfers -->
+          <div class="bg-white rounded-xl shadow-sm p-5">
+            <h3 class="font-semibold text-gray-700 mb-3">Recent Transfers</h3>
+            <div v-if="dashboard.recent_transfers && dashboard.recent_transfers.length" class="space-y-2">
+              <div v-for="r in dashboard.recent_transfers" :key="r.id" class="flex justify-between text-sm">
+                <span class="text-gray-600">{{ r.partner_name }}</span>
+                <span class="font-semibold text-orange-500">-{{ formatMoney(r.amount) }}</span>
+              </div>
+            </div>
+            <p v-else class="text-sm text-gray-400">No transfers yet.</p>
+          </div>
+        </div>
+      </div><!-- /dashboard -->
+
+      <!-- ── Incomes ─────────────────────────────────────────── -->
+      <div v-if="currentView === 'incomes'">
+        <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-6">
+          <h2 class="text-xl font-bold text-gray-800">Incomes</h2>
+          <button
+            v-if="currentUser.role === 'admin'"
+            @click="openCreateModal('income')"
+            class="bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold px-4 py-2 rounded-lg transition-colors"
+          >
+            + Add Income
+          </button>
+        </div>
+
+        <!-- Filters -->
+        <div class="bg-white rounded-xl shadow-sm p-4 mb-4 flex flex-col sm:flex-row gap-3 items-end">
+          <div>
+            <label class="block text-xs text-gray-500 mb-1">From</label>
+            <input type="date" v-model="filters.incomes.dateFrom"
+              class="border border-gray-300 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400" />
+          </div>
+          <div>
+            <label class="block text-xs text-gray-500 mb-1">To</label>
+            <input type="date" v-model="filters.incomes.dateTo"
+              class="border border-gray-300 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400" />
+          </div>
+          <button @click="loadIncomes"
+            class="bg-gray-100 hover:bg-gray-200 text-gray-700 text-sm font-medium px-4 py-1.5 rounded-lg transition-colors">
+            Filter
+          </button>
+          <button @click="filters.incomes = {dateFrom:'',dateTo:''}; loadIncomes()"
+            class="text-gray-400 hover:text-gray-600 text-sm px-2 py-1.5">
+            Clear
+          </button>
+        </div>
+
+        <div class="bg-white rounded-xl shadow-sm overflow-hidden">
+          <div class="overflow-x-auto">
+            <table class="min-w-full text-sm">
+              <thead class="bg-gray-50 border-b border-gray-200">
+                <tr>
+                  <th class="text-left px-4 py-3 font-medium text-gray-600">Date</th>
+                  <th class="text-left px-4 py-3 font-medium text-gray-600">Description</th>
+                  <th class="text-right px-4 py-3 font-medium text-gray-600">Amount</th>
+                  <th class="text-left px-4 py-3 font-medium text-gray-600">Added by</th>
+                  <th v-if="currentUser.role === 'admin'" class="px-4 py-3"></th>
+                </tr>
+              </thead>
+              <tbody class="divide-y divide-gray-100">
+                <tr v-if="loading.incomes">
+                  <td colspan="5" class="px-4 py-6 text-center text-gray-400">Loading…</td>
+                </tr>
+                <tr v-else-if="!incomes.length">
+                  <td colspan="5" class="px-4 py-6 text-center text-gray-400">No incomes found.</td>
+                </tr>
+                <tr v-else v-for="r in incomes" :key="r.id" class="hover:bg-gray-50 transition-colors">
+                  <td class="px-4 py-3 text-gray-700">{{ r.date }}</td>
+                  <td class="px-4 py-3 text-gray-500">{{ r.description || '—' }}</td>
+                  <td class="px-4 py-3 text-right font-semibold text-green-600">{{ formatMoney(r.amount) }}</td>
+                  <td class="px-4 py-3 text-gray-500">{{ r.created_by_username || '—' }}</td>
+                  <td v-if="currentUser.role === 'admin'" class="px-4 py-3">
+                    <div class="flex gap-2 justify-end">
+                      <button @click="openEditModal('income', r)"
+                        class="text-blue-500 hover:text-blue-700 text-xs font-medium">Edit</button>
+                      <button @click="deleteRecord('incomes', r.id)"
+                        class="text-red-500 hover:text-red-700 text-xs font-medium">Delete</button>
+                    </div>
+                  </td>
+                </tr>
+              </tbody>
+              <tfoot v-if="incomes.length" class="bg-gray-50 border-t border-gray-200">
+                <tr>
+                  <td colspan="2" class="px-4 py-3 font-semibold text-gray-700">Total</td>
+                  <td class="px-4 py-3 text-right font-bold text-green-600">{{ formatMoney(incomesTotal) }}</td>
+                  <td :colspan="currentUser.role === 'admin' ? 2 : 1"></td>
+                </tr>
+              </tfoot>
+            </table>
+          </div>
+        </div>
+      </div><!-- /incomes -->
+
+      <!-- ── Outcomes ────────────────────────────────────────── -->
+      <div v-if="currentView === 'outcomes'">
+        <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-6">
+          <h2 class="text-xl font-bold text-gray-800">Outcomes</h2>
+          <button
+            v-if="currentUser.role === 'admin'"
+            @click="openCreateModal('outcome')"
+            class="bg-red-500 hover:bg-red-600 text-white text-sm font-semibold px-4 py-2 rounded-lg transition-colors"
+          >
+            + Add Outcome
+          </button>
+        </div>
+
+        <!-- Filters -->
+        <div class="bg-white rounded-xl shadow-sm p-4 mb-4 flex flex-col sm:flex-row gap-3 items-end">
+          <div>
+            <label class="block text-xs text-gray-500 mb-1">From</label>
+            <input type="date" v-model="filters.outcomes.dateFrom"
+              class="border border-gray-300 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400" />
+          </div>
+          <div>
+            <label class="block text-xs text-gray-500 mb-1">To</label>
+            <input type="date" v-model="filters.outcomes.dateTo"
+              class="border border-gray-300 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400" />
+          </div>
+          <button @click="loadOutcomes"
+            class="bg-gray-100 hover:bg-gray-200 text-gray-700 text-sm font-medium px-4 py-1.5 rounded-lg transition-colors">
+            Filter
+          </button>
+          <button @click="filters.outcomes = {dateFrom:'',dateTo:''}; loadOutcomes()"
+            class="text-gray-400 hover:text-gray-600 text-sm px-2 py-1.5">
+            Clear
+          </button>
+        </div>
+
+        <div class="bg-white rounded-xl shadow-sm overflow-hidden">
+          <div class="overflow-x-auto">
+            <table class="min-w-full text-sm">
+              <thead class="bg-gray-50 border-b border-gray-200">
+                <tr>
+                  <th class="text-left px-4 py-3 font-medium text-gray-600">Date</th>
+                  <th class="text-left px-4 py-3 font-medium text-gray-600">Description</th>
+                  <th class="text-right px-4 py-3 font-medium text-gray-600">Amount</th>
+                  <th class="text-left px-4 py-3 font-medium text-gray-600">Added by</th>
+                  <th v-if="currentUser.role === 'admin'" class="px-4 py-3"></th>
+                </tr>
+              </thead>
+              <tbody class="divide-y divide-gray-100">
+                <tr v-if="loading.outcomes">
+                  <td colspan="5" class="px-4 py-6 text-center text-gray-400">Loading…</td>
+                </tr>
+                <tr v-else-if="!outcomes.length">
+                  <td colspan="5" class="px-4 py-6 text-center text-gray-400">No outcomes found.</td>
+                </tr>
+                <tr v-else v-for="r in outcomes" :key="r.id" class="hover:bg-gray-50 transition-colors">
+                  <td class="px-4 py-3 text-gray-700">{{ r.date }}</td>
+                  <td class="px-4 py-3 text-gray-500">{{ r.description }}</td>
+                  <td class="px-4 py-3 text-right font-semibold text-red-500">{{ formatMoney(r.amount) }}</td>
+                  <td class="px-4 py-3 text-gray-500">{{ r.created_by_username || '—' }}</td>
+                  <td v-if="currentUser.role === 'admin'" class="px-4 py-3">
+                    <div class="flex gap-2 justify-end">
+                      <button @click="openEditModal('outcome', r)"
+                        class="text-blue-500 hover:text-blue-700 text-xs font-medium">Edit</button>
+                      <button @click="deleteRecord('outcomes', r.id)"
+                        class="text-red-500 hover:text-red-700 text-xs font-medium">Delete</button>
+                    </div>
+                  </td>
+                </tr>
+              </tbody>
+              <tfoot v-if="outcomes.length" class="bg-gray-50 border-t border-gray-200">
+                <tr>
+                  <td colspan="2" class="px-4 py-3 font-semibold text-gray-700">Total</td>
+                  <td class="px-4 py-3 text-right font-bold text-red-500">{{ formatMoney(outcomesTotal) }}</td>
+                  <td :colspan="currentUser.role === 'admin' ? 2 : 1"></td>
+                </tr>
+              </tfoot>
+            </table>
+          </div>
+        </div>
+      </div><!-- /outcomes -->
+
+      <!-- ── Transfers ───────────────────────────────────────── -->
+      <div v-if="currentView === 'transfers'">
+        <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-6">
+          <h2 class="text-xl font-bold text-gray-800">Partner Transfers</h2>
+          <button
+            v-if="currentUser.role === 'admin'"
+            @click="openCreateModal('transfer')"
+            class="bg-orange-500 hover:bg-orange-600 text-white text-sm font-semibold px-4 py-2 rounded-lg transition-colors"
+          >
+            + New Transfer
+          </button>
+        </div>
+
+        <div class="bg-white rounded-xl shadow-sm overflow-hidden">
+          <div class="overflow-x-auto">
+            <table class="min-w-full text-sm">
+              <thead class="bg-gray-50 border-b border-gray-200">
+                <tr>
+                  <th class="text-left px-4 py-3 font-medium text-gray-600">Date</th>
+                  <th class="text-left px-4 py-3 font-medium text-gray-600">Partner</th>
+                  <th class="text-left px-4 py-3 font-medium text-gray-600">Notes</th>
+                  <th class="text-right px-4 py-3 font-medium text-gray-600">Amount</th>
+                  <th class="text-left px-4 py-3 font-medium text-gray-600">By</th>
+                  <th v-if="currentUser.role === 'admin'" class="px-4 py-3"></th>
+                </tr>
+              </thead>
+              <tbody class="divide-y divide-gray-100">
+                <tr v-if="loading.transfers">
+                  <td colspan="6" class="px-4 py-6 text-center text-gray-400">Loading…</td>
+                </tr>
+                <tr v-else-if="!transfers.length">
+                  <td colspan="6" class="px-4 py-6 text-center text-gray-400">No transfers found.</td>
+                </tr>
+                <tr v-else v-for="r in transfers" :key="r.id" class="hover:bg-gray-50 transition-colors">
+                  <td class="px-4 py-3 text-gray-700">{{ formatDateTime(r.created_at) }}</td>
+                  <td class="px-4 py-3 font-medium text-gray-800">{{ r.partner_name }}</td>
+                  <td class="px-4 py-3 text-gray-500">{{ r.notes || '—' }}</td>
+                  <td class="px-4 py-3 text-right font-semibold text-orange-500">{{ formatMoney(r.amount) }}</td>
+                  <td class="px-4 py-3 text-gray-500">{{ r.created_by_username || '—' }}</td>
+                  <td v-if="currentUser.role === 'admin'" class="px-4 py-3">
+                    <div class="flex gap-2 justify-end">
+                      <button @click="openEditModal('transfer', r)"
+                        class="text-blue-500 hover:text-blue-700 text-xs font-medium">Edit</button>
+                      <button @click="deleteRecord('transfers', r.id)"
+                        class="text-red-500 hover:text-red-700 text-xs font-medium">Delete</button>
+                    </div>
+                  </td>
+                </tr>
+              </tbody>
+              <tfoot v-if="transfers.length" class="bg-gray-50 border-t border-gray-200">
+                <tr>
+                  <td colspan="3" class="px-4 py-3 font-semibold text-gray-700">Total</td>
+                  <td class="px-4 py-3 text-right font-bold text-orange-500">{{ formatMoney(transfersTotal) }}</td>
+                  <td :colspan="currentUser.role === 'admin' ? 2 : 1"></td>
+                </tr>
+              </tfoot>
+            </table>
+          </div>
+        </div>
+      </div><!-- /transfers -->
+
+      <!-- ── Users ───────────────────────────────────────────── -->
+      <div v-if="currentView === 'users'">
+        <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-6">
+          <h2 class="text-xl font-bold text-gray-800">User Management</h2>
+          <button
+            v-if="allowUserModifications"
+            @click="openCreateModal('user')"
+            class="bg-purple-600 hover:bg-purple-700 text-white text-sm font-semibold px-4 py-2 rounded-lg transition-colors"
+          >
+            + Add User
+          </button>
+        </div>
+
+        <div v-if="!allowUserModifications"
+          class="bg-yellow-50 border border-yellow-200 text-yellow-800 text-sm rounded-lg px-4 py-3 mb-4">
+          ⚠️ User modifications are disabled by the server configuration (ALLOW_USER_MODIFICATIONS = false).
+        </div>
+
+        <div class="bg-white rounded-xl shadow-sm overflow-hidden">
+          <div class="overflow-x-auto">
+            <table class="min-w-full text-sm">
+              <thead class="bg-gray-50 border-b border-gray-200">
+                <tr>
+                  <th class="text-left px-4 py-3 font-medium text-gray-600">ID</th>
+                  <th class="text-left px-4 py-3 font-medium text-gray-600">Username</th>
+                  <th class="text-left px-4 py-3 font-medium text-gray-600">Full Name</th>
+                  <th class="text-left px-4 py-3 font-medium text-gray-600">Role</th>
+                  <th class="text-left px-4 py-3 font-medium text-gray-600">Created</th>
+                  <th v-if="allowUserModifications" class="px-4 py-3"></th>
+                </tr>
+              </thead>
+              <tbody class="divide-y divide-gray-100">
+                <tr v-if="loading.users">
+                  <td colspan="6" class="px-4 py-6 text-center text-gray-400">Loading…</td>
+                </tr>
+                <tr v-else-if="!users.length">
+                  <td colspan="6" class="px-4 py-6 text-center text-gray-400">No users found.</td>
+                </tr>
+                <tr v-else v-for="u in users" :key="u.id" class="hover:bg-gray-50 transition-colors">
+                  <td class="px-4 py-3 text-gray-500">{{ u.id }}</td>
+                  <td class="px-4 py-3 font-medium text-gray-800">{{ u.username }}</td>
+                  <td class="px-4 py-3 text-gray-600">{{ u.full_name || '—' }}</td>
+                  <td class="px-4 py-3">
+                    <span :class="['inline-block px-2 py-0.5 rounded-full text-xs font-semibold',
+                      u.role === 'admin' ? 'bg-purple-100 text-purple-700' : 'bg-gray-100 text-gray-600']">
+                      {{ u.role }}
+                    </span>
+                  </td>
+                  <td class="px-4 py-3 text-gray-500">{{ formatDateTime(u.created_at) }}</td>
+                  <td v-if="allowUserModifications" class="px-4 py-3">
+                    <div class="flex gap-2 justify-end">
+                      <button @click="openEditModal('user', u)"
+                        class="text-blue-500 hover:text-blue-700 text-xs font-medium">Edit</button>
+                      <button
+                        v-if="u.id !== currentUser.id"
+                        @click="deleteRecord('users', u.id)"
+                        class="text-red-500 hover:text-red-700 text-xs font-medium">Delete</button>
+                    </div>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div><!-- /users -->
+
+      <!-- ── Audit Logs ──────────────────────────────────────── -->
+      <div v-if="currentView === 'audit_logs'">
+        <h2 class="text-xl font-bold text-gray-800 mb-6">Audit Logs</h2>
+
+        <div class="bg-white rounded-xl shadow-sm overflow-hidden">
+          <div class="overflow-x-auto">
+            <table class="min-w-full text-sm">
+              <thead class="bg-gray-50 border-b border-gray-200">
+                <tr>
+                  <th class="text-left px-4 py-3 font-medium text-gray-600">Timestamp</th>
+                  <th class="text-left px-4 py-3 font-medium text-gray-600">Action</th>
+                  <th class="text-left px-4 py-3 font-medium text-gray-600">Table</th>
+                  <th class="text-left px-4 py-3 font-medium text-gray-600">Record ID</th>
+                  <th class="text-left px-4 py-3 font-medium text-gray-600">Performed By</th>
+                  <th class="text-left px-4 py-3 font-medium text-gray-600">Before</th>
+                  <th class="text-left px-4 py-3 font-medium text-gray-600">After</th>
+                </tr>
+              </thead>
+              <tbody class="divide-y divide-gray-100">
+                <tr v-if="loading.auditLogs">
+                  <td colspan="7" class="px-4 py-6 text-center text-gray-400">Loading…</td>
+                </tr>
+                <tr v-else-if="!auditLogs.length">
+                  <td colspan="7" class="px-4 py-6 text-center text-gray-400">No audit log entries yet.</td>
+                </tr>
+                <tr v-else v-for="log in auditLogs" :key="log.id" class="hover:bg-gray-50 transition-colors">
+                  <td class="px-4 py-3 text-gray-500 whitespace-nowrap">{{ formatDateTime(log.created_at) }}</td>
+                  <td class="px-4 py-3">
+                    <span :class="['inline-block px-2 py-0.5 rounded-full text-xs font-semibold',
+                      log.action_type === 'INSERT' ? 'bg-green-100 text-green-700' :
+                      log.action_type === 'UPDATE' ? 'bg-blue-100 text-blue-700' :
+                      'bg-red-100 text-red-700']">
+                      {{ log.action_type }}
+                    </span>
+                  </td>
+                  <td class="px-4 py-3 text-gray-600 font-mono text-xs">{{ log.table_name }}</td>
+                  <td class="px-4 py-3 text-gray-500">{{ log.record_id || '—' }}</td>
+                  <td class="px-4 py-3 text-gray-700 font-medium">{{ log.performed_by_username || '—' }}</td>
+                  <td class="px-4 py-3 max-w-xs">
+                    <pre v-if="log.original_data" class="text-xs text-gray-500 overflow-auto max-h-20 whitespace-pre-wrap">{{ formatJson(log.original_data) }}</pre>
+                    <span v-else class="text-gray-400">—</span>
+                  </td>
+                  <td class="px-4 py-3 max-w-xs">
+                    <pre v-if="log.modified_data" class="text-xs text-gray-500 overflow-auto max-h-20 whitespace-pre-wrap">{{ formatJson(log.modified_data) }}</pre>
+                    <span v-else class="text-gray-400">—</span>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div><!-- /audit_logs -->
+
+    </main>
+  </div><!-- /main app -->
+
+  <!-- ═══════════════════════════════════════════════════════════
+       MODAL
+  ══════════════════════════════════════════════════════════════ -->
+  <div
+    v-if="modal.show"
+    class="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4"
+    @click.self="modal.show = false"
+  >
+    <div class="bg-white rounded-2xl shadow-2xl w-full max-w-md max-h-[90vh] overflow-y-auto">
+
+      <!-- Modal Header -->
+      <div class="flex items-center justify-between p-5 border-b border-gray-200">
+        <h3 class="font-bold text-gray-800 text-lg">{{ modalTitle }}</h3>
+        <button @click="modal.show = false" class="text-gray-400 hover:text-gray-600 text-xl font-bold">✕</button>
+      </div>
+
+      <!-- Modal Body -->
+      <form @submit.prevent="saveModal" class="p-5 space-y-4">
+
+        <!-- Income / Outcome fields -->
+        <template v-if="modal.type === 'income' || modal.type === 'outcome'">
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Amount *</label>
+            <input v-model="modal.form.amount" type="number" step="0.01" min="0.01" required
+              class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
+              placeholder="0.00" />
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">
+              Description {{ modal.type === 'outcome' ? '*' : '' }}
+            </label>
+            <input v-model="modal.form.description" type="text"
+              :required="modal.type === 'outcome'"
+              class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
+              placeholder="Optional note…" />
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Date *</label>
+            <input v-model="modal.form.date" type="date" required
+              class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400" />
+          </div>
+        </template>
+
+        <!-- Transfer fields -->
+        <template v-if="modal.type === 'transfer'">
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Partner *</label>
+            <select v-model="modal.form.partner_id"
+              @change="onPartnerSelect"
+              class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400">
+              <option value="">— Type name manually —</option>
+              <option v-for="u in partnerUsers" :key="u.id" :value="u.id">{{ u.full_name || u.username }}</option>
+            </select>
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Partner Name *</label>
+            <input v-model="modal.form.partner_name" type="text" required
+              class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
+              placeholder="Partner full name" />
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Amount *</label>
+            <input v-model="modal.form.amount" type="number" step="0.01" min="0.01" required
+              class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
+              placeholder="0.00" />
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Notes</label>
+            <textarea v-model="modal.form.notes" rows="2"
+              class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
+              placeholder="Optional notes…"></textarea>
+          </div>
+        </template>
+
+        <!-- User fields -->
+        <template v-if="modal.type === 'user'">
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Username *</label>
+            <input v-model="modal.form.username" type="text" required
+              class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
+              placeholder="john_doe" />
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Full Name</label>
+            <input v-model="modal.form.full_name" type="text"
+              class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
+              placeholder="John Doe" />
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Role *</label>
+            <select v-model="modal.form.role" required
+              class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400">
+              <option value="partner">Partner</option>
+              <option value="admin">Admin</option>
+            </select>
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">
+              Password {{ modal.mode === 'edit' ? '(leave blank to keep current)' : '*' }}
+            </label>
+            <input v-model="modal.form.password" type="password"
+              :required="modal.mode === 'create'"
+              minlength="6"
+              class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
+              placeholder="••••••••" />
+          </div>
+        </template>
+
+        <!-- Modal error -->
+        <div v-if="modal.error" class="bg-red-50 border border-red-200 text-red-700 text-sm rounded-lg px-3 py-2">
+          {{ modal.error }}
+        </div>
+
+        <!-- Buttons -->
+        <div class="flex gap-3 pt-2">
+          <button type="submit" :disabled="modal.saving"
+            class="flex-1 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white font-semibold py-2 rounded-lg transition-colors text-sm">
+            <span v-if="modal.saving">Saving…</span>
+            <span v-else>{{ modal.mode === 'create' ? 'Create' : 'Save Changes' }}</span>
+          </button>
+          <button type="button" @click="modal.show = false"
+            class="flex-1 bg-gray-100 hover:bg-gray-200 text-gray-700 font-semibold py-2 rounded-lg transition-colors text-sm">
+            Cancel
+          </button>
+        </div>
+      </form>
+    </div>
+  </div><!-- /modal -->
+
+</div><!-- /app -->
+
+<script>
+const { createApp, reactive, computed } = Vue;
+
+const API = 'api.php';
+
+async function apiFetch(action, method = 'GET', body = null, params = {}) {
+  const url = new URL(API, window.location.href);
+  url.searchParams.set('action', action);
+  for (const [k, v] of Object.entries(params)) {
+    if (v !== '' && v !== null && v !== undefined) {
+      url.searchParams.set(k, v);
+    }
+  }
+
+  const options = {
+    method,
+    credentials: 'same-origin',
+    headers: { 'Content-Type': 'application/json' },
+  };
+
+  if (body !== null) {
+    options.body = JSON.stringify(body);
+  }
+
+  const res = await fetch(url.toString(), options);
+  const data = await res.json();
+
+  if (!res.ok) {
+    throw new Error(data.error || `HTTP ${res.status}`);
+  }
+
+  return data;
+}
+
+createApp({
+  data() {
+    const today = new Date().toISOString().slice(0, 10);
+
+    return {
+      // Auth
+      currentUser: null,
+      loginForm: { username: '', password: '' },
+      loginError: '',
+      loginLoading: false,
+
+      // Nav
+      currentView: 'dashboard',
+
+      // Config
+      allowUserModifications: true,
+
+      // Dashboard
+      dashboard: {
+        caisse: 0,
+        income_total: 0,
+        outcome_total: 0,
+        transfer_total: 0,
+        recent_incomes: [],
+        recent_outcomes: [],
+        recent_transfers: [],
+      },
+
+      // Data
+      incomes:   [],
+      outcomes:  [],
+      transfers: [],
+      users:     [],
+      auditLogs: [],
+
+      // Filters
+      filters: {
+        incomes:  { dateFrom: '', dateTo: '' },
+        outcomes: { dateFrom: '', dateTo: '' },
+      },
+
+      // Loading flags
+      loading: {
+        incomes:   false,
+        outcomes:  false,
+        transfers: false,
+        users:     false,
+        auditLogs: false,
+      },
+
+      // Global error
+      globalError: '',
+
+      // Modal
+      modal: {
+        show:   false,
+        mode:   'create', // 'create' | 'edit'
+        type:   null,     // 'income' | 'outcome' | 'transfer' | 'user'
+        editId: null,
+        form:   {},
+        error:  '',
+        saving: false,
+      },
+
+      // Misc
+      today,
+    };
+  },
+
+  computed: {
+    allTabs() {
+      return [
+        { id: 'dashboard',  label: 'Dashboard',  icon: '📊', roles: ['admin', 'partner'] },
+        { id: 'incomes',    label: 'Incomes',     icon: '💰', roles: ['admin', 'partner'] },
+        { id: 'outcomes',   label: 'Outcomes',    icon: '💸', roles: ['admin', 'partner'] },
+        { id: 'transfers',  label: 'Transfers',   icon: '🤝', roles: ['admin', 'partner'] },
+        { id: 'users',      label: 'Users',       icon: '👥', roles: ['admin'] },
+        { id: 'audit_logs', label: 'Audit Logs',  icon: '📋', roles: ['admin', 'partner'] },
+      ];
+    },
+
+    visibleTabs() {
+      if (!this.currentUser) return [];
+      return this.allTabs.filter(t => t.roles.includes(this.currentUser.role));
+    },
+
+    partnerUsers() {
+      return this.users.filter(u => u.role === 'partner');
+    },
+
+    incomesTotal() {
+      return this.incomes.reduce((s, r) => s + parseFloat(r.amount), 0);
+    },
+
+    outcomesTotal() {
+      return this.outcomes.reduce((s, r) => s + parseFloat(r.amount), 0);
+    },
+
+    transfersTotal() {
+      return this.transfers.reduce((s, r) => s + parseFloat(r.amount), 0);
+    },
+
+    modalTitle() {
+      const labels = {
+        income:   'Income',
+        outcome:  'Outcome',
+        transfer: 'Transfer',
+        user:     'User',
+      };
+      const label = labels[this.modal.type] || '';
+      return this.modal.mode === 'create' ? `Add ${label}` : `Edit ${label}`;
+    },
+  },
+
+  methods: {
+    // ── Formatting ──────────────────────────────────────────
+    formatMoney(val) {
+      const n = parseFloat(val) || 0;
+      return n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    },
+
+    formatDateTime(dt) {
+      if (!dt) return '—';
+      return new Date(dt).toLocaleString('en-GB', {
+        day: '2-digit', month: '2-digit', year: 'numeric',
+        hour: '2-digit', minute: '2-digit',
+      });
+    },
+
+    formatJson(str) {
+      try {
+        return JSON.stringify(JSON.parse(str), null, 2);
+      } catch {
+        return str;
+      }
+    },
+
+    // ── Auth ────────────────────────────────────────────────
+    async login() {
+      this.loginError  = '';
+      this.loginLoading = true;
+      try {
+        const data = await apiFetch('login', 'POST', this.loginForm);
+        this.currentUser = data.user;
+        this.loginForm   = { username: '', password: '' };
+        await this.initApp();
+      } catch (e) {
+        this.loginError = e.message;
+      } finally {
+        this.loginLoading = false;
+      }
+    },
+
+    async logout() {
+      try {
+        await apiFetch('logout', 'POST');
+      } catch { /* ignore */ }
+      this.currentUser  = null;
+      this.currentView  = 'dashboard';
+      this.dashboard    = { caisse: 0, income_total: 0, outcome_total: 0, transfer_total: 0,
+                            recent_incomes: [], recent_outcomes: [], recent_transfers: [] };
+      this.incomes = []; this.outcomes = []; this.transfers = [];
+      this.users = []; this.auditLogs = [];
+    },
+
+    // ── Init ────────────────────────────────────────────────
+    async initApp() {
+      // Load config and dashboard in parallel
+      try {
+        const [cfg] = await Promise.all([
+          apiFetch('config'),
+          this.loadDashboard(),
+        ]);
+        this.allowUserModifications = cfg.allow_user_modifications;
+      } catch (e) {
+        this.globalError = 'Failed to load application config: ' + e.message;
+      }
+    },
+
+    // ── View switching ──────────────────────────────────────
+    async switchView(view) {
+      this.currentView = view;
+      this.globalError = '';
+      switch (view) {
+        case 'dashboard':  await this.loadDashboard(); break;
+        case 'incomes':    await this.loadIncomes();   break;
+        case 'outcomes':   await this.loadOutcomes();  break;
+        case 'transfers':  await this.loadTransfers(); break;
+        case 'users':      await this.loadUsers();     break;
+        case 'audit_logs': await this.loadAuditLogs(); break;
+      }
+    },
+
+    // ── Data loaders ────────────────────────────────────────
+    async loadDashboard() {
+      try {
+        this.dashboard = await apiFetch('dashboard');
+      } catch (e) {
+        this.globalError = 'Dashboard error: ' + e.message;
+      }
+    },
+
+    async loadIncomes() {
+      this.loading.incomes = true;
+      try {
+        this.incomes = await apiFetch('incomes', 'GET', null, {
+          date_from: this.filters.incomes.dateFrom,
+          date_to:   this.filters.incomes.dateTo,
+        });
+      } catch (e) {
+        this.globalError = 'Incomes error: ' + e.message;
+      } finally {
+        this.loading.incomes = false;
+      }
+    },
+
+    async loadOutcomes() {
+      this.loading.outcomes = true;
+      try {
+        this.outcomes = await apiFetch('outcomes', 'GET', null, {
+          date_from: this.filters.outcomes.dateFrom,
+          date_to:   this.filters.outcomes.dateTo,
+        });
+      } catch (e) {
+        this.globalError = 'Outcomes error: ' + e.message;
+      } finally {
+        this.loading.outcomes = false;
+      }
+    },
+
+    async loadTransfers() {
+      this.loading.transfers = true;
+      try {
+        this.transfers = await apiFetch('transfers');
+      } catch (e) {
+        this.globalError = 'Transfers error: ' + e.message;
+      } finally {
+        this.loading.transfers = false;
+      }
+    },
+
+    async loadUsers() {
+      this.loading.users = true;
+      try {
+        this.users = await apiFetch('users');
+      } catch (e) {
+        this.globalError = 'Users error: ' + e.message;
+      } finally {
+        this.loading.users = false;
+      }
+    },
+
+    async loadAuditLogs() {
+      this.loading.auditLogs = true;
+      try {
+        this.auditLogs = await apiFetch('audit_logs');
+      } catch (e) {
+        this.globalError = 'Audit log error: ' + e.message;
+      } finally {
+        this.loading.auditLogs = false;
+      }
+    },
+
+    // ── Modal helpers ────────────────────────────────────────
+    openCreateModal(type) {
+      const defaults = {
+        income:   { amount: '', description: '', date: this.today },
+        outcome:  { amount: '', description: '', date: this.today },
+        transfer: { amount: '', partner_id: '', partner_name: '', notes: '' },
+        user:     { username: '', full_name: '', role: 'partner', password: '' },
+      };
+
+      this.modal = {
+        show:   true,
+        mode:   'create',
+        type,
+        editId: null,
+        form:   { ...defaults[type] },
+        error:  '',
+        saving: false,
+      };
+
+      // Pre-load users when creating a transfer so the dropdown is populated
+      if (type === 'transfer' && !this.users.length) {
+        this.loadUsers();
+      }
+    },
+
+    openEditModal(type, record) {
+      const formMap = {
+        income:   { amount: record.amount, description: record.description || '', date: record.date },
+        outcome:  { amount: record.amount, description: record.description, date: record.date },
+        transfer: { amount: record.amount, partner_id: record.partner_id || '', partner_name: record.partner_name, notes: record.notes || '' },
+        user:     { username: record.username, full_name: record.full_name || '', role: record.role, password: '' },
+      };
+
+      this.modal = {
+        show:   true,
+        mode:   'edit',
+        type,
+        editId: record.id,
+        form:   { ...formMap[type] },
+        error:  '',
+        saving: false,
+      };
+
+      if (type === 'transfer' && !this.users.length) {
+        this.loadUsers();
+      }
+    },
+
+    // Populate partner_name when a partner is selected from the dropdown
+    onPartnerSelect() {
+      const pid = parseInt(this.modal.form.partner_id);
+      if (pid) {
+        const u = this.users.find(u => u.id === pid);
+        if (u) this.modal.form.partner_name = u.full_name || u.username;
+      }
+    },
+
+    async saveModal() {
+      this.modal.error  = '';
+      this.modal.saving = true;
+
+      const { type, mode, editId, form } = this.modal;
+
+      const actionMap = {
+        income:   'incomes',
+        outcome:  'outcomes',
+        transfer: 'transfers',
+        user:     'users',
+      };
+      const action = actionMap[type];
+
+      try {
+        if (mode === 'create') {
+          await apiFetch(action, 'POST', form);
+        } else {
+          await apiFetch(action, 'PUT', form, { id: editId });
+        }
+
+        this.modal.show = false;
+        this.globalError = '';
+
+        // Refresh relevant list + dashboard
+        await Promise.all([
+          this[`load${this.capitalize(action)}`](),
+          this.loadDashboard(),
+        ]);
+
+      } catch (e) {
+        this.modal.error = e.message;
+      } finally {
+        this.modal.saving = false;
+      }
+    },
+
+    async deleteRecord(resource, id) {
+      if (!confirm('Are you sure you want to delete this record?')) return;
+
+      try {
+        await apiFetch(resource, 'DELETE', null, { id });
+        this.globalError = '';
+        await Promise.all([
+          this[`load${this.capitalize(resource)}`](),
+          this.loadDashboard(),
+        ]);
+      } catch (e) {
+        this.globalError = 'Delete failed: ' + e.message;
+      }
+    },
+
+    capitalize(str) {
+      // 'incomes' → 'Incomes', 'audit_logs' → 'AuditLogs'
+      return str
+        .split('_')
+        .map(w => w.charAt(0).toUpperCase() + w.slice(1))
+        .join('');
+    },
+  },
+
+  // ── Lifecycle ─────────────────────────────────────────────
+  async mounted() {
+    // Check if already logged in (existing session)
+    try {
+      const data = await apiFetch('me');
+      if (data.authenticated) {
+        this.currentUser = data.user;
+        await this.initApp();
+      }
+    } catch { /* not logged in */ }
+  },
+}).mount('#app');
+</script>
+</body>
+</html>
