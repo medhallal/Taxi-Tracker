@@ -89,15 +89,12 @@ CREATE TABLE IF NOT EXISTS audit_logs (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 -- ------------------------------------------------------------------
--- Default admin account  (password: admin123)
--- IMPORTANT: change the password immediately after first login!
--- The hash below was generated with password_hash('admin123', PASSWORD_BCRYPT).
+-- Default admin account
+-- IMPORTANT: Do NOT run this INSERT manually – the placeholder hash
+-- is not a valid bcrypt hash.
+-- Use setup.php instead: it creates the admin account with a proper
+-- password_hash()-generated hash automatically.
+-- Default credentials set by setup.php:  admin / admin123
+-- Change the password immediately after first login!
 -- ------------------------------------------------------------------
-INSERT IGNORE INTO users (username, password, role, full_name)
-VALUES (
-    'admin',
-    '$2y$10$YourHashHere_ReplaceViaSetupPhp',
-    'admin',
-    'Administrator'
-);
--- ^^^ Run setup.php in your browser instead – it generates a proper hash automatically.
+-- INSERT is intentionally omitted here; run setup.php.

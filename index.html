@@ -1071,10 +1071,15 @@ createApp({
         this.globalError = '';
 
         // Refresh relevant list + dashboard
-        await Promise.all([
-          this[`load${this.capitalize(action)}`](),
-          this.loadDashboard(),
-        ]);
+        const loaderName = `load${this.toPascalCase(action)}`;
+        if (typeof this[loaderName] === 'function') {
+          await Promise.all([
+            this[loaderName](),
+            this.loadDashboard(),
+          ]);
+        } else {
+          await this.loadDashboard();
+        }
 
       } catch (e) {
         this.modal.error = e.message;
@@ -1089,16 +1094,17 @@ createApp({
       try {
         await apiFetch(resource, 'DELETE', null, { id });
         this.globalError = '';
-        await Promise.all([
-          this[`load${this.capitalize(resource)}`](),
-          this.loadDashboard(),
-        ]);
+        const loaderName = `load${this.toPascalCase(resource)}`;
+        const refreshList = typeof this[loaderName] === 'function'
+          ? this[loaderName]()
+          : Promise.resolve();
+        await Promise.all([refreshList, this.loadDashboard()]);
       } catch (e) {
         this.globalError = 'Delete failed: ' + e.message;
       }
     },
 
-    capitalize(str) {
+    toPascalCase(str) {
       // 'incomes' → 'Incomes', 'audit_logs' → 'AuditLogs'
       return str
         .split('_')

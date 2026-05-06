@@ -30,6 +30,10 @@ try {
     );
 
     // 1. Create database
+    // Validate DB_NAME to prevent SQL injection from config values.
+    if (!preg_match('/^[a-zA-Z0-9_]+$/', DB_NAME)) {
+        throw new RuntimeException('Invalid DB_NAME in config.php – only letters, digits and underscores are allowed.');
+    }
     $pdo->exec("CREATE DATABASE IF NOT EXISTS `" . DB_NAME . "` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci");
     $pdo->exec("USE `" . DB_NAME . "`");
     $messages[] = "✅ Database <strong>" . htmlspecialchars(DB_NAME) . "</strong> ready.";

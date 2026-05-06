@@ -799,6 +799,12 @@ function handleAuditLogs(): void
 /** Fetches a single row by primary key from any table. */
 function fetchById(PDO $db, string $table, int $id): array|false
 {
+    // Allowlist of valid table names – never interpolate user-controlled input.
+    static $allowed = ['incomes', 'outcomes', 'transfers', 'users', 'audit_logs'];
+    if (!in_array($table, $allowed, true)) {
+        throw new InvalidArgumentException("Unknown table: $table");
+    }
+
     $stmt = $db->prepare("SELECT * FROM $table WHERE id = ?");
     $stmt->execute([$id]);
     return $stmt->fetch();
