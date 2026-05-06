@@ -30,7 +30,10 @@ try {
     );
 
     // 1. Create database
-    // Validate DB_NAME to prevent SQL injection from config values.
+    // DB_NAME is interpolated into SQL because PDO does not support parameter
+    // binding for database names in CREATE DATABASE / USE statements.
+    // We restrict the value to alphanumeric characters and underscores to
+    // eliminate any injection risk from a misconfigured config.php.
     if (!preg_match('/^[a-zA-Z0-9_]+$/', DB_NAME)) {
         throw new RuntimeException('Invalid DB_NAME in config.php – only letters, digits and underscores are allowed.');
     }
