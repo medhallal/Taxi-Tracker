@@ -1,0 +1,26 @@
+# =============================================================
+# Taxi Financial Tracker – Apache Configuration
+# =============================================================
+
+# Disable directory listing
+Options -Indexes
+
+# Deny direct HTTP access to PHP helper files
+# (they produce no output when accessed directly, but this
+#  is an extra safety measure)
+<FilesMatch "^(config|db)\.php$">
+    Order allow,deny
+    Deny from all
+</FilesMatch>
+
+# Deny access to setup.php after initial setup
+# Uncomment the lines below once setup is complete:
+# <FilesMatch "^setup\.php$">
+#     Order allow,deny
+#     Deny from all
+# </FilesMatch>
+
+# Ensure PHP files are served correctly
+<IfModule mod_php.c>
+    php_flag display_errors Off
+</IfModule>
