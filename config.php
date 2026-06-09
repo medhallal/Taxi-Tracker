@@ -6,12 +6,12 @@
 // =============================================================
 
 // ----- Database -----------------------------------------------
-define('DB_HOST', 'localhost');
-define('DB_PORT', 3306);
-define('DB_NAME', 'taxi_tracker');
-define('DB_USER', 'root');
-define('DB_PASS', '');
-define('DB_CHARSET', 'utf8mb4');
+const DB_HOST = 'localhost';
+const DB_PORT = 3306;
+const DB_NAME = 'wjexqgiq_taxi_tracker';
+const DB_USER = 'wjexqgiq_taxi_tracker';
+const DB_PASS = 'l,Z,d{]jnsW?';
+const DB_CHARSET = 'utf8mb4';
 
 // ----- Feature flags ------------------------------------------
 /**
@@ -23,8 +23,8 @@ define('DB_CHARSET', 'utf8mb4');
  * The frontend will also hide the "Add / Edit / Delete" buttons for
  * the Users section when this value is false.
  */
-define('ALLOW_USER_MODIFICATIONS', true);
+const ALLOW_USER_MODIFICATIONS = true;
 
 // ----- Session ------------------------------------------------
 // Change to a long random string in production.
-define('SESSION_NAME', 'taxi_tracker_session');
+const SESSION_NAME = 'vxJO60VzbgkiPXKnUpSs30isuDY8VeA2Ou4dVM3Qjb1w85vFuTbZl5o4YThrJSSv';

@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="PublishConfigData" serverName="almaarij" remoteFilesAllowedToDisappearOnAutoupload="false">
+    <serverData>
+      <paths name="almaarij">
+        <serverdata>
+          <mappings>
+            <mapping deploy="/taxi.pixelinfo.ma" local="$PROJECT_DIR$" web="https://taxi.pixelinfo.ma" />
+          </mappings>
+        </serverdata>
+      </paths>
+    </serverData>
+  </component>
+</project>
